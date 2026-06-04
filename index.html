@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Entrées Soirée</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 600px; 
+            margin: 20px auto; 
+            padding: 15px; 
+            background-color: #121214; 
+            color: #e1e1e6;
+        }
+        h1 { text-align: center; color: #fff; margin-bottom: 30px; }
+        .form-container { display: flex; gap: 10px; margin-bottom: 25px; }
+        input[type="text"] { 
+            flex: 1; 
+            padding: 12px; 
+            border: 1px solid #29292e; 
+            border-radius: 6px; 
+            font-size: 16px; 
+            background-color: #202024;
+            color: white;
+        }
+        input[type="text"]:focus { outline: 2px solid #8257e5; }
+        button { 
+            padding: 12px 20px; 
+            background-color: #8257e5; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            font-weight: bold;
+        }
+        button:hover { background-color: #9466ff; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 15px; 
+            background: #202024; 
+            margin-bottom: 10px; 
+            border-radius: 6px; 
+            border: 1px solid #29292e;
+            transition: all 0.2s ease;
+        }
+        li.checked { 
+            background-color: #1c2f24; 
+            border-color: #24422e;
+            color: #7cdb97; 
+        }
+        li.checked span { text-decoration: line-through; opacity: 0.6; }
+        .checkbox-container { display: flex; align-items: center; gap: 15px; cursor: pointer; flex: 1; }
+        .btn-delete { 
+            background-color: #e54141; 
+            padding: 8px 12px; 
+            font-size: 14px; 
+            border-radius: 4px;
+        }
+        .btn-delete:hover { background-color: #f75a5a; }
+        input[type="checkbox"] { transform: scale(1.4); cursor: pointer; accent-color: #8257e5; }
+    </style>
+</head>
+<body>
+
+    <h1>🎉 Liste des Entrées</h1>
+
+    <div class="form-container">
+        <input type="text" id="guestName" placeholder="Nom de l'invité (ex: Dupont Jean)..." autocomplete="off">
+        <button onclick="addGuest()">Ajouter</button>
+    </div>
+
+    <ul id="guestList"></ul>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Ta configuration Firebase officielle
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKIkSDq9SZ5Ss2c2DtdGWqrr5wAPp1xjs",
+            authDomain: "mesentreessoiree.firebaseapp.com",
+            databaseURL: "https://mesentreessoiree-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "mesentreessoiree",
+            storageBucket: "mesentreessoiree.firebasestorage.app",
+            messagingSenderId: "470608904219",
+            appId: "1:470608904219:web:931ec22f18c6231546f8be",
+            measurementId: "G-E37G8K4RHV"
+        };
+
+        // Initialisation
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const guestsRef = ref(db, 'invites');
+
+        // Écoute de la base de données en temps réel
+        onValue(guestsRef, (snapshot) => {
+            const guestListElement = document.getElementById('guestList');
+            guestListElement.innerHTML = ''; 
+            
+            const data = snapshot.val();
+            if (data) {
+                const guestsArray = [];
+                for (let id in data) {
+                    guestsArray.push({ id: id, ...data[id] });
+                }
+
+                // Tri alphabétique automatique
+                guestsArray.sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+
+                // Rendu HTML des invités
+                guestsArray.forEach(guest => {
+                    const li = document.createElement('li');
+                    if (guest.inside) li.classList.add('checked');
+
+                    li.innerHTML = `
+                        <label class="checkbox-container">
+                            <input type="checkbox" ${guest.inside ? 'checked' : ''} onchange="toggleGuest('${guest.id}', ${guest.inside})">
+                            <span>${guest.name}</span>
+                        </label>
+                        <button class="btn-delete" onclick="deleteGuest('${guest.id}')">Supprimer</button>
+                    `;
+                    guestListElement.appendChild(li);
+                });
+            } else {
+                guestListElement.innerHTML = '<p style="text-align:center; color:#8d8d99;">La liste est vide pour le moment.</p>';
+            }
+        });
+
+        // Ajouter un invité
+        window.addGuest = function() {
+            const nameInput = document.getElementById('guestName');
+            const name = nameInput.value.trim();
+            
+            if (name !== "") {
+                const newGuestRef = push(guestsRef);
+                set(newGuestRef, {
+                    name: name,
+                    inside: false
+                });
+                nameInput.value = ""; 
+                nameInput.focus();
+            }
+        };
+
+        // Gérer l'appui sur "Entrée" dans le clavier pour ajouter plus vite
+        document.getElementById('guestName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addGuest();
+            }
+        });
+
+        // Cocher / Décocher
+        window.toggleGuest = function(id, currentStatus) {
+            const guestRef = ref(db, `invites/${id}`);
+            update(guestRef, { inside: !currentStatus });
+        };
+
+        // Supprimer
+        window.deleteGuest = function(id) {
+            if (confirm("Supprimer cet invité de la liste ?")) {
+                const guestRef = ref(db, `invites/${id}`);
+                remove(guestRef);
+            }
+        };
+    </script>
+</body>
+</html>
