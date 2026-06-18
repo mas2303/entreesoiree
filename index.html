@@ -7,7 +7,7 @@
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            max-width: 600px; 
+            max-width: 650px; 
             margin: 20px auto; 
             padding: 15px; 
             background-color: #121214; 
@@ -47,14 +47,20 @@
             border-radius: 6px; 
             border: 1px solid #29292e;
             transition: all 0.2s ease;
+            gap: 15px;
         }
         li.checked { 
             background-color: #1c2f24; 
             border-color: #24422e;
             color: #7cdb97; 
         }
-        li.checked span { text-decoration: line-through; opacity: 0.6; }
-        .checkbox-container { display: flex; align-items: center; gap: 15px; cursor: pointer; flex: 1; }
+        li.checked .guest-name { text-decoration: line-through; opacity: 0.6; }
+        
+        /* Conteneurs pour aligner les éléments */
+        .controls-container { display: flex; align-items: center; gap: 20px; flex: 1; }
+        .checkbox-container { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .guest-name { flex: 1; min-width: 120px; word-break: break-word; }
+        
         .btn-delete { 
             background-color: #e54141; 
             padding: 8px 12px; 
@@ -62,7 +68,11 @@
             border-radius: 4px;
         }
         .btn-delete:hover { background-color: #f75a5a; }
-        input[type="checkbox"] { transform: scale(1.4); cursor: pointer; accent-color: #8257e5; }
+        
+        input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
+        .check-inside { accent-color: #8257e5; }
+        .check-paid { accent-color: #04d361; }
+        .label-text { font-size: 12px; opacity: 0.7; margin-left: 2px; }
     </style>
 </head>
 <body>
@@ -117,11 +127,23 @@
                     const li = document.createElement('li');
                     if (guest.inside) li.classList.add('checked');
 
+                    // Gestion des valeurs par défaut si 'paid' n'existe pas encore sur les anciens invités
+                    const isPaid = guest.paid || false;
+
                     li.innerHTML = `
-                        <label class="checkbox-container">
-                            <input type="checkbox" ${guest.inside ? 'checked' : ''} onchange="toggleGuest('${guest.id}', ${guest.inside})">
-                            <span>${guest.name}</span>
-                        </label>
+                        <div class="controls-container">
+                            <label class="checkbox-container">
+                                <input type="checkbox" class="check-inside" ${guest.inside ? 'checked' : ''} onchange="toggleGuestInside('${guest.id}', ${guest.inside})">
+                                <span class="label-text">Entré</span>
+                            </label>
+                            
+                            <label class="checkbox-container">
+                                <input type="checkbox" class="check-paid" ${isPaid ? 'checked' : ''} onchange="toggleGuestPaid('${guest.id}', ${isPaid})">
+                                <span class="label-text">Payé</span>
+                            </label>
+
+                            <span class="guest-name">${guest.name}</span>
+                        </div>
                         <button class="btn-delete" onclick="deleteGuest('${guest.id}')">Supprimer</button>
                     `;
                     guestListElement.appendChild(li);
@@ -140,24 +162,31 @@
                 const newGuestRef = push(guestsRef);
                 set(newGuestRef, {
                     name: name,
-                    inside: false
+                    inside: false,
+                    paid: false // Nouvelle propriété ajoutée à la création
                 });
                 nameInput.value = ""; 
                 nameInput.focus();
             }
         };
 
-        // Gérer l'appui sur "Entrée" dans le clavier pour ajouter plus vite
+        // Gérer l'appui sur "Entrée" dans le clavier
         document.getElementById('guestName').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 addGuest();
             }
         });
 
-        // Cocher / Décocher
-        window.toggleGuest = function(id, currentStatus) {
+        // Cocher / Décocher la Présence (Entré)
+        window.toggleGuestInside = function(id, currentStatus) {
             const guestRef = ref(db, `invites/${id}`);
             update(guestRef, { inside: !currentStatus });
+        };
+
+        // Cocher / Décocher le Paiement
+        window.toggleGuestPaid = function(id, currentStatus) {
+            const guestRef = ref(db, `invites/${id}`);
+            update(guestRef, { paid: !currentStatus });
         };
 
         // Supprimer
